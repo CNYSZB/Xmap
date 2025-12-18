@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地形生成by抖音:走位很呆</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            border: 2px solid #444;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #2ecc71;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #27ae60;
+        }
+        .seed-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        input {
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            width: 200px;
+        }
+        .legend {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 0 5px;
+        }
+        .color-block {
+            width: 20px;
+            height: 20px;
+            border-radius: 2px;
+        }
+        .village-hint {
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: #333;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <h1>地形生成器</h1>
+    <canvas id="terrainCanvas" width="1000" height="700"></canvas>
+    <div class="controls">
+        <button id="regenerateBtn">重新生成地形</button>
+        <button id="saveMapBtn">保存地图</button>
+        <div class="seed-group">
+            <input type="text" id="seedInput" placeholder="输入种子（如666888）">
+        </div>
+    </div>
+    <div class="legend">
+        <div class="legend-item"><div class="color-block" style="background: #002699;"></div><span>深海</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #0066ff;"></div><span>浅海</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #f5f5dc;"></div><span>沙滩</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #228B22;"></div><span>平原</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #90EE90;"></div><span>丘陵</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #006400;"></div><span>高山</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #808080;"></div><span>山峰</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #a67c52;"></div><span>村庄主路</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #c69c6d;"></div><span>村庄支路</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #8b4513;"></div><span>房屋墙壁</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #654321;"></div><span>房屋屋顶</span></div>
+        <div class="legend-item"><div class="color-block" style="background: #7ccd7c;"></div><span>小型农田</span></div>
+    </div>
+    <div id="villageHint" class="village-hint"></div>
+
+    <script>
+        class ImprovedSimplexNoise {
+            constructor(seed = Math.random()) {
+                this.seed = seed;
+                this.perm = new Array(512);
+                this.p = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,
+                    8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,
+                    32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,134,139,48,27,
+                    166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,
+                    143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,196,135,130,116,188,
+                    159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,
+                    82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,119,248,152,2,44,
+                    154,163,70,221,153,101,155,167,43,172,9,129,22,39,253,19,98,108,110,79,113,224,232,
+                    178,185,112,104,218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,
+                    145,235,249,14,239,107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,
+                    4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+                for (let i = 0; i < 256; i++) {
+                    this.perm[i] = this.p[Math.floor((i + this.seed * 10000) % 256)];
+                    this.perm[256 + i] = this.perm[i];
+                }
+            }
+            fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+            lerp(a, b, t) { return a + t * (b - a); }
+            grad(hash, x, y) {
+                const h = hash & 15; const u = h < 8 ? x : y; const v = h < 4 ? y : h === 12 || h === 14 ? x : 0;
+                return ((h & 1) === 0 ? u : -u)+((h & 2) === 0 ? v : -v);
+            }
+            noise(x, y) {
+                const X = Math.floor(x) & 255; const Y = Math.floor(y) & 255; x -= Math.floor(x); y -= Math.floor(y);
+                const u = this.fade(x); const v = this.fade(y); const A = this.perm[X] + Y; const B = this.perm[X + 1] + Y;
+                return this.lerp(this.lerp(this.grad(this.perm[A], x, y), this.grad(this.perm[B], x - 1, y), u), this.lerp(this.grad(this.perm[A + 1], x, y - 1), this.grad(this.perm[B + 1], x - 1, y - 1), u), v);
+            }
+            fractalNoise(x, y, octaves = 8, persistence = 0.5, lacunarity = 2.0) {
+                let total = 0, amplitude = 1, frequency = 1, maxValue = 0;
+                for (let i = 0; i < octaves; i++) { total += this.noise(x * frequency, y * frequency) * amplitude; maxValue += amplitude; amplitude *= persistence; frequency *= lacunarity; }
+                return total / maxValue;
+            }
+        }
+
+        const canvas = document.getElementById('terrainCanvas');
+        const ctx = canvas.getContext('2d');
+        const regenerateBtn = document.getElementById('regenerateBtn');
+        const saveMapBtn = document.getElementById('saveMapBtn');
+        const seedInput = document.getElementById('seedInput');
+        const villageHint = document.getElementById('villageHint');
+
+        let seed, scale, landRatio, octaves, persistence;
+        let imageData;
+        const mapWidth = canvas.width;
+        const mapHeight = canvas.height;
+        let villageCenter = {x: -1, y: -1};
+        let roadPixels = new Set();
+        let housePixels = new Set();
+
+        const colors = {
+            mainRoad: { r: 166, g: 124, b: 82 },
+            branchRoad: { r: 198, g: 156, b: 109 },
+            houseWall: { r: 139, g: 69, b: 19 },
+            houseRoof: { r: 101, g: 67, b: 33 },
+            farmland: { r: 124, g: 205, b: 124 }
+        };
+
+        const baseTerrainColors = {
+            deepOcean: {r:0, g:38, b:153},
+            shallowOcean: {r:0, g:102, b:255},
+            sand: {r:245, g:245, b:220},
+            plain: {r:34, g:139, b:34},
+            hill: {r:144, g:238, b:144},
+            mountain: {r:0, g:100, b:0},
+            peak: {r:128, g:128, b:128}
+        };
+
+        // 严格陆地判定
+        function isLandStrict(x, y, noiseGenerator) {
+            const noiseValue = noiseGenerator.fractalNoise(x * scale, y * scale, octaves, persistence);
+            const norm = (noiseValue + 1) / 2;
+            const oceanThreshold = 0.5 - (landRatio - 0.4) * 0.2;
+            return norm >= oceanThreshold;
+        }
+
+        // 寻找大型陆地中心
+        function findLargeLandCenter(noiseGenerator) {
+            let attempts = 0;
+            const maxAttempts = 200;
+            const checkRadius = 30;
+            while (attempts < maxAttempts) {
+                const x = Math.floor(Math.random() * (mapWidth - 2*checkRadius) + checkRadius);
+                const y = Math.floor(Math.random() * (mapHeight - 2*checkRadius) + checkRadius);
+                let isLargeLand = true;
+                for (let dx = -checkRadius; dx <= checkRadius; dx++) {
+                    for (let dy = -checkRadius; dy <= checkRadius; dy++) {
+                        if (!isLandStrict(x+dx, y+dy, noiseGenerator)) {
+                            isLargeLand = false;
+                            break;
+                        }
+                    }
+                    if (!isLargeLand) break;
+                }
+                if (isLargeLand) {
+                    return {x, y};
+                }
+                attempts++;
+            }
+            return {x: mapWidth / 2, y: mapHeight / 2};
+        }
+
+        function fixedSeededRandom(baseSeed, offset, min, max) {
+            const s = baseSeed + offset * 1000; const x = Math.sin(s)*10000;
+            return min + (x - Math.floor(x))*(max - min);
+        }
+
+        function getTerrainColor(value) {
+            const norm = (value + 1)/2;
+            const oceanThreshold = 0.5-(landRatio - 0.4)*0.2;
+            if (norm < oceanThreshold - 0.05) return baseTerrainColors.deepOcean;
+            else if (norm < oceanThreshold) return interpolateColor(baseTerrainColors.deepOcean, baseTerrainColors.shallowOcean, (norm - (oceanThreshold - 0.05))/0.05);
+            else if (norm < oceanThreshold + 0.03) return interpolateColor(baseTerrainColors.shallowOcean, baseTerrainColors.sand, (norm - oceanThreshold)/0.03);
+            else if (norm < oceanThreshold + 0.08) return baseTerrainColors.plain;
+            else if (norm < oceanThreshold + 0.15) return interpolateColor(baseTerrainColors.plain, baseTerrainColors.hill, (norm - (oceanThreshold + 0.08))/0.07);
+            else if (norm < oceanThreshold + 0.25) return interpolateColor(baseTerrainColors.hill, baseTerrainColors.mountain, (norm - (oceanThreshold + 0.15))/0.1);
+            else return baseTerrainColors.peak;
+        }
+
+        function interpolateColor(c1, c2, t) {
+            t = Math.pow(t, 1.2);
+            return { r: Math.floor(c1.r + (c2.r - c1.r) * t), g: Math.floor(c1.g + (c2.g - c1.g) * t), b: Math.floor(c1.b + (c2.b - c1.b) * t) };
+        }
+
+        function setPixel(x, y, color) {
+            if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) return;
+            const index = (y * mapWidth + x)*4;
+            imageData.data[index] = color.r;
+            imageData.data[index + 1] = color.g;
+            imageData.data[index + 2] = color.b;
+            imageData.data[index + 3] = 255;
+            if (color === colors.mainRoad || color === colors.branchRoad) {
+                roadPixels.add(`${x},${y}`);
+            }
+            if (color === colors.houseWall || color === colors.houseRoof) {
+                housePixels.add(`${x},${y}`);
+            }
+        }
+
+        // 生成大型路网
+        function generateLargeRoadFromPoint(startX, startY, noiseGenerator) {
+            const directions = [
+                {dx: 1, dy: 0}, {dx: 0, dy: 1},
+                {dx: -1, dy: 0}, {dx: 0, dy: -1}
+            ];
+            directions.forEach(dir => {
+                const length = Math.floor(Math.random() * 6) + 20;
+                for (let i = 0; i < length; i++) {
+                    const x = startX + dir.dx * i;
+                    const y = startY + dir.dy * i;
+                    if (isLandStrict(x, y, noiseGenerator)) {
+                        setPixel(x, y, colors.mainRoad);
+                        if (i > 5 && i < length - 5 && Math.random() < 0.5) {
+                            const branchDirs = dir.dx !== 0 ? [{dx:0, dy:1}, {dx:0, dy:-1}] : [{dx:1, dy:0}, {dx:-1, dy:0}];
+                            const branchDir = branchDirs[Math.floor(Math.random() * 2)];
+                            const branchLength = Math.floor(Math.random() * 5) + 8;
+                            for (let j = 1; j <= branchLength; j++) {
+                                const bx = x + branchDir.dx * j;
+                                const by = y + branchDir.dy * j;
+                                if (isLandStrict(bx, by, noiseGenerator)) {
+                                    setPixel(bx, by, colors.branchRoad);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 生成大型房屋群
+        function generateLargeHouseGroup(noiseGenerator) {
+            const roadArr = Array.from(roadPixels);
+            if (roadArr.length === 0) return;
+
+            const houseCount = Math.floor(Math.random() * 6) + 15;
+            const usedPositions = new Set();
+
+            for (let i = 0; i < houseCount; i++) {
+                const randomRoad = roadArr[Math.floor(Math.random() * roadArr.length)];
+                const [rx, ry] = randomRoad.split(',').map(Number);
+                const offsets = [[0, -2], [0, -3], [0, 2], [0, 3], [-2, 0], [-3, 0], [2, 0], [3, 0]];
+                const [ox, oy] = offsets[Math.floor(Math.random() * offsets.length)];
+                const houseX = rx + ox;
+                const houseY = ry + oy;
+                const posKey = `${houseX},${houseY}`;
+
+                if (isLandStrict(houseX, houseY, noiseGenerator) && !usedPositions.has(posKey)) {
+                    usedPositions.add(posKey);
+                    const houseSize = 6;
+                    for (let wx = 0; wx < houseSize; wx++) {
+                        for (let wy = 0; wy < houseSize; wy++) {
+                            setPixel(houseX + wx, houseY + wy, colors.houseWall);
+                        }
+                    }
+                    const roofY = houseY + Math.floor(houseSize/2);
+                    for (let wx = 0; wx < houseSize; wx++) {
+                        setPixel(houseX + wx, roofY, colors.houseRoof);
+                    }
+                }
+            }
+        }
+
+        // 生成小型农田
+        function generateSmallFarmland(startX, startY, noiseGenerator) {
+            const farmCount = Math.floor(Math.random() * 3) + 2;
+            const roadArr = Array.from(roadPixels);
+            if (roadArr.length === 0) return;
+
+            for (let f = 0; f < farmCount; f++) {
+                const randomRoadEnd = roadArr[Math.floor(Math.random() * roadArr.length)];
+                const [rx, ry] = randomRoadEnd.split(',').map(Number);
+                const farmOffset = [[8, 0], [-8, 0], [0, 8], [0, -8]];
+                const [fxOff, fyOff] = farmOffset[Math.floor(Math.random() * farmOffset.length)];
+                const farmX = rx + fxOff;
+                const farmY = ry + fyOff;
+                const farmSize = 5;
+
+                for (let wx = 0; wx < farmSize; wx++) {
+                    for (let wy = 0; wy < farmSize; wy++) {
+                        const px = farmX + wx;
+                        const py = farmY + wy;
+                        const posKey = `${px},${py}`;
+                        if (isLandStrict(px, py, noiseGenerator) && !roadPixels.has(posKey) && !housePixels.has(posKey)) {
+                            setPixel(px, py, colors.farmland);
+                        }
+                    }
+                }
+            }
+        }
+
+        function generateVillage(noiseGenerator) {
+            roadPixels.clear();
+            housePixels.clear();
+            villageCenter = findLargeLandCenter(noiseGenerator);
+            const {x: centerX, y: centerY} = villageCenter;
+
+            generateLargeRoadFromPoint(centerX, centerY, noiseGenerator);
+            generateLargeHouseGroup(noiseGenerator);
+            generateSmallFarmland(centerX, centerY, noiseGenerator);
+
+            // 移除村庄中心红色标识绘制代码
+            villageHint.textContent = "";
+        }
+
+        function initParamsBySeed(importedSeed = null) {
+            seed = importedSeed !== null ? importedSeed : Math.floor(Math.random()*1000000);
+            scale = fixedSeededRandom(seed, 1, 0.005, 0.008);
+            landRatio = fixedSeededRandom(seed, 2, 0.45, 0.6);
+            octaves = Math.floor(fixedSeededRandom(seed, 3, 6, 8));
+            persistence = fixedSeededRandom(seed, 4, 0.5, 0.7);
+            seedInput.value = seed;
+            villageCenter = {x: -1, y: -1};
+        }
+
+        function generateTerrain(importedSeed = null) {
+            initParamsBySeed(importedSeed);
+            const noiseGenerator = new ImprovedSimplexNoise(seed);
+            imageData = ctx.createImageData(mapWidth, mapHeight);
+
+            for (let y = 0; y < mapHeight; y++) {
+                for (let x = 0; x < mapWidth; x++) {
+                    const noiseValue = noiseGenerator.fractalNoise(x * scale, y * scale, octaves, persistence);
+                    const color = getTerrainColor(noiseValue);
+                    setPixel(x, y, color);
+                }
+            }
+
+            generateVillage(noiseGenerator);
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function saveMapAsImage() {
+            const link = document.createElement('a');
+            link.download = `mc_terrain_seed_${seed}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        let inputTimer = null;
+        seedInput.addEventListener('input', () => {
+            clearTimeout(inputTimer);
+            inputTimer = setTimeout(() => {
+                const inputSeed = parseInt(seedInput.value);
+                if (!isNaN(inputSeed) && inputSeed > 0) generateTerrain(inputSeed);
+            }, 300);
+        });
+
+        regenerateBtn.addEventListener('click', () => generateTerrain());
+        saveMapBtn.addEventListener('click', saveMapAsImage);
+
+        generateTerrain();
+    </script>
+</body>
+</html>
